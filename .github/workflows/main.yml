@@ -14,9 +14,14 @@ jobs:
           sudo apt install -y openssh-server
           sudo systemctl enable ssh
           sudo systemctl start ssh
-          echo "root:${{ secrets.ROOT_PASS }}" | sudo chpasswd
-          echo "PermitRootLogin yes" | sudo tee -a /etc/ssh/sshd_config
-          sudo service ssh restart
+
+          # تهيئة مفتاح SSH
+          sudo mkdir -p /root/.ssh
+          echo "${{ secrets.SSH_PUB_KEY }}" | sudo tee /root/.ssh/authorized_keys
+          sudo chmod 600 /root/.ssh/authorized_keys
+          sudo chmod 700 /root/.ssh
+          sudo chown -R root:root /root/.ssh
+          echo "✅ SSH Key added for root"
 
       - name: Install Tailscale
         run: |
@@ -24,6 +29,8 @@ jobs:
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=my-vps
           tsIP=$(tailscale ip -4 | head -n 1)
           echo "TAILSCALE_IP=$tsIP" >> $GITHUB_ENV
+          echo "✅ Tailscale IP: $tsIP"
+          echo "✅ Or connect via MagicDNS: my-vps.tailnet-name.ts.net"
 
       - name: Send Telegram Notification
         run: |
@@ -31,7 +38,7 @@ jobs:
           IP: $TAILSCALE_IP
           Host: my-vps.tailnet-name.ts.net
           User: root
-          Pass: (from secrets)"
+          Auth: SSH Key (no password)"
           
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TG_CHAT_ID }} \
